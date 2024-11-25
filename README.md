@@ -32,13 +32,23 @@ fork 自 [Neutralization/bilibili-down](https://github.com/Neutralization/bilibi
 - 支持了 AV 号与 BV 号。
 
 ## 安装
-正在编写安装脚本，在此之前，您可以将 bilidown 的文件下载，然后赋予运行权限：
+1. 脚本安装或卸载
+```
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/silvaire-qwq/bilibili-down/refs/heads/master/install.sh)"
+```
+
+2. 您也可以将 bilidown 的文件下载，然后赋予运行权限：
 ```shell
 chmod +x bilidown
 ```
 
 ## 使用方法
-```
+```shell
+# 脚本安装
+bilidown av号
+bilidown bv号
+
+# 手动安装
 ./bilidown av号
 ./bilidown bv号
 ```
@@ -49,4 +59,8 @@ chmod +x bilidown
 3. 选择 `Network` 或者网络。
 4. 按下 <kbd>F5</kbd> 刷新页面。
 5. 选择第一行，找到名为 ```cookies``` 的项的值并复制。
-6. 找到文件中名为 `cookies` 的变量，并将 ```cookies``` 的值中名字相同的值填入：`DedeUserID=****; DedeUserID__ckMd5=****; SESSDATA=****; bili_jct=****`
+6. 找到文件中名为 `cookies` 的变量，并将 ```cookies``` 的值中与下方名字相同的值按照下方格式填入 ```~/.config/bilidown```
+
+```shell
+export cookies='DedeUserID=****; DedeUserID__ckMd5=****; SESSDATA=****; bili_jct=****'
+```
