@@ -32,7 +32,7 @@ fork 自 [Neutralization/bilibili-down](https://github.com/Neutralization/bilibi
 - 支持了 AV 号与 BV 号。
 
 ## 安装
-1. 脚本安装或卸载 (Windows 与 Termux 用户请勿使用，没有在 macOS 上测试，Linux 使用正常。)
+1. 脚本安装或卸载 (目前只在 Arch Linux x86 上测试过)
 ```
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/silvaire-qwq/bilibili-down/refs/heads/master/install.sh)"
 ```
