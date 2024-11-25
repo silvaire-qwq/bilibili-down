@@ -60,6 +60,7 @@ read -n1 -s confirm
 case $confirm in 
     Y | y)
         install_bilidown
+        source /etc/profile
         ;;
     R | r)
         remove_bilidown
