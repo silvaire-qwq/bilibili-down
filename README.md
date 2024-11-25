@@ -5,6 +5,9 @@ fork 自 [Neutralization/bilibili-down](https://github.com/Neutralization/bilibi
 > [!CAUTION]
 > 此脚本仅供学习，请勿滥用，后果自负。
 
+> [!CAUTION]
+> 此脚本目前只在 Arch Linux x86 上测试过，其他设备请谨慎使用。
+
 ## 修改或添加的功能
 - 汉化。
 - 支持 BV 号。
