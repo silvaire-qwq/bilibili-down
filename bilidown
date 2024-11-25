@@ -1,0 +1,195 @@
+#!/bin/bash
+
+export cookies='DedeUserID=; DedeUserID__ckMd5=; SESSDATA=; bili_jct=`'
+export BV2AV_API="https://api.bilibili.com/x/web-interface/view"  # API URL
+export HEADER="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"
+
+
+curl bilibili.com &>/dev/null
+if [[ $? -ne 0 ]]; then
+    echo -e "\e[31m⨯\e[0m 网络错误。\n"
+    exit 1
+fi
+
+if [[ ! $(command -v curl) || ! $(command -v aria2c) || ! $(command -v jq) || ! $(command -v ffmpeg) || ! $(command -v awk) || ! $(command -v sed) ]]; then
+    echo -e "\e[31m⨯\e[0m 您似乎没有安装所有需要的软件。请您检查是否已安装 curl、aria2、jq、awk、sed 和 ffmpeg 。"
+    if [[ $(command -v pacman) ]]; then
+        echo -e "\e[33m%\e[0m 正在尝试安装所有需要的软件"
+        sudo pacman -S --needed --noconfirm curl aria2 jq ffmpeg gawk sed
+        if [[ $? -eq 0 ]]; then
+            echo -e "\e[32m✓\e[0m 安装成功。"
+        else
+            echo -e "\e[31m⨯\e[0m 安装失败。"
+            exit 1
+        fi
+    else
+        exit 1
+    fi 
+fi
+
+
+
+# 将BV号转换为AV号
+bv_to_av() {
+    bv=$1
+    response=$(curl -s -H "$HEADER" "$BV2AV_API?bvid=$bv")
+
+    if [[ $? -ne 0 ]]; then
+        exit 1
+    fi
+
+    # 解析 JSON 获取 aid（AV号）
+    av=$(echo "$response" | jq -r '.data.aid')
+
+    if [ "$av" != "null" ]; then
+        echo "av$av"
+    else
+        exit 1
+    fi
+}
+
+# 检查是否有参数
+if [ $# -eq 0 ]; then
+    echo -e "\e[31m⨯\e[0m 需要 AV 号或 BV 号来下载视频。"
+    exit 1
+fi
+
+# 将传入的所有参数转换成数组
+args=("$@")
+
+# 遍历数组，找到包含 BV 的参数，并进行转换
+for i in "${!args[@]}"; do
+    if [[ "${args[$i]}" =~ ^BV ]]; then
+        echo -e "\e[34m*\e[0m 在您输入的参数中发现 BV 号: ${args[$i]}"
+        # 转换 BV 为 AV
+        av_id=$(bv_to_av "${args[$i]}")
+        if [ -n "$av_id" ]; then
+            echo -e "\e[34m*\e[0m 正在将其替换为 AV 号: $av_id"
+            # 将该参数替换为 AV ID
+            args[$i]=$av_id
+        else
+            echo -e "\e[31m⨯\e[0m 不合法的 BV 号。"
+            exit 1
+        fi
+    fi
+done
+
+# 更新 $@ 参数
+set -- "${args[@]}"
+
+# 现在开始处理视频下载的逻辑
+IFS=$'\n'
+until [ $# -eq 0 ]; do
+    aid=`echo $1 | sed -e 's/.*av//g' -e 's/[a-zA-Z?/].*//g'`
+    pagelist='https://api.bilibili.com/x/player/pagelist?aid='$aid'&jsonp=jsonp'
+    echo -e "\e[34m*\e[0m 正在获取视频信息"
+    cids=`curl -sL -H "Cookie: "$cookies $pagelist | jq -r '.data[].cid'`
+    title=`curl -sL -H "Cookie: "$cookies 'https://api.bilibili.com/x/web-interface/view?aid='$aid | jq -r '.data.title' | sed 's/[/?!.*|:]//g'`
+    cids_arr=($cids)
+    echo -e "\e[34m*\e[0m 已寻找到 "${#cids_arr[@]}" 个视频"
+
+    part=0
+    for cid in $cids
+    do
+        episode=$(( ++part ))
+        echo -e "\e[35m○\e[0m 开始下载第 "$episode" 个视频"
+        if [ "${#cids_arr[@]}" == "1" ]
+        then
+            filename=av$aid.$title.mp4
+        else
+            filename=av$aid.$title【P$episode】.mp4
+        fi
+        json_url='https://api.bilibili.com/x/player/playurl?avid='$aid'&cid='$cid'&qn=116&fnver=0&fnval=16&otype=json&type='
+        echo -e "\e[34m*\e[0m 正在获取视频信息"
+        json=`curl -sL -H "Cookie: "$cookies $json_url`
+        dash=`echo $json | jq '.data|has("dash")'`
+        durl=`echo $json | jq '.data|has("durl")'`
+
+        if [ "$dash" == "true" ]
+        then
+            vp=`echo $json | jq -r '.data.dash.video[0].baseUrl'`
+            ap=`echo $json | jq -r '.data.dash.audio[0].baseUrl'`
+
+            echo -e "\e[34m*\e[0m 开始下载视频"
+            aria2c -x10 -k1M --file-allocation=none --auto-file-renaming=false --allow-overwrite=true $vp\
+                --show-console-readout false --quiet \
+                --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:65.0) Gecko/20100101 Firefox/65.0"\
+                --header="Accept: */*"\
+                --header="Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2"\
+                --header="Referer: https://www.bilibili.com/video/av"$aid\
+                --header="Origin: https://www.bilibili.com"\
+                --header="DNT: 1"\
+                --header="Connection: keep-alive"\
+                --header="Pragma: no-cache"\
+                --header="Cache-Control: no-cache"\
+                --header="Cookie: "$cookies \
+                --out ./v_$cid.m4s
+
+            echo -e "\e[34m*\e[0m 开始下载音频"
+            aria2c -x10 -k1M --file-allocation=none --auto-file-renaming=false --allow-overwrite=true $ap\
+                --show-console-readout false --quiet \
+                --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:65.0) Gecko/20100101 Firefox/65.0"\
+                --header="Accept: */*"\
+                --header="Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2"\
+                --header="Referer: https://www.bilibili.com/video/av"$aid\
+                --header="Origin: https://www.bilibili.com"\
+                --header="DNT: 1"\
+                --header="Connection: keep-alive"\
+                --header="Pragma: no-cache"\
+                --header="Cache-Control: no-cache"\
+                --header="Cookie: "$cookies \
+                --out ./a_$cid.m4s
+
+            echo -e "\e[34m*\e[0m 正在合并"
+            ffmpeg -i ./v_$cid.m4s -i ./a_$cid.m4s -c:v copy -c:a copy\
+                -y -hide_banner -loglevel panic \
+                ./$filename
+            echo -e "\e[34m*\e[0m 正在删除无用的文件"
+            rm *.m4s
+            if [[ $? -eq 0 ]]; then
+                echo -e "\e[32m✓\e[0m 下载成功。"
+            else
+                echo -e "\e[31m⨯\e[0m 下载失败。"
+                exit 1
+            fi
+        elif [ "$durl" == "true" ]
+        then
+            flvs=`echo $json | jq -r '.data.durl[].url'`
+            for flv in $flvs
+            do
+                flvname=`echo $flv | sed -e 's/\?.*//g' -e 's/.*\///g'`
+                echo "file './"$flvname"'" >> ./merge_$cid.txt
+                echo "\e[34m*\e[0m 开始下载视频的第 "$flvname" 部分"
+                aria2c -x10 -k1M --file-allocation=none --auto-file-renaming=false --allow-overwrite=true $flv\
+                    --show-console-readout false --quiet \
+                    --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:65.0) Gecko/20100101 Firefox/65.0"\
+                    --header="Accept: */*"\
+                    --header="Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2"\
+                    --header="Referer: https://www.bilibili.com/video/av"$aid\
+                    --header="Origin: https://www.bilibili.com"\
+                    --header="DNT: 1"\
+                    --header="Connection: keep-alive"\
+                    --header="Pragma: no-cache" --header="Cache-Control: no-cache"\
+                    --header="Cookie: "$cookies \
+                    --out ./$flvname
+            done
+            echo "\e[34m*\e[0m 正在合并"
+            ffmpeg -safe 0 -f concat -i ./merge_$cid.txt -c copy\
+                -y -hide_banner -loglevel panic \
+                ./$filename
+            echo -e "\e[34m*\e[0m 正在删除无用的文件"
+            rm *.flv
+            rm ./merge_$cid.txt
+            if [[ $? -eq 0 ]]; then
+                echo -e "\e[32m✓\e[0m 下载成功。"
+            else
+                echo -e "\e[31m⨯\e[0m 下载失败。"
+                exit 1
+            fi
+        else
+            echo -e "\e[31m⨯\e[0m 视频不存在。"
+            exit 1
+        fi
+    done
+    shift
+done
