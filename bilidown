@@ -1,9 +1,12 @@
 #!/bin/bash
 
-[[ ! -f ~/.config/bilidown ]] || source ~/.config/bilidown
+[[ ! -f ~/.config/bilidown ]] || export cookies="$(cat ~/.config/bilidown)"
 export BV2AV_API="https://api.bilibili.com/x/web-interface/view"  # API URL
 export HEADER="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"
 
+if [[ $cookies ]]; then
+    echo -e "\e[32m✓\e[0m 已成功地添加 Cookies ，但未验证是否可用。您添加的 Cookies 为 \"$cookies\" 。"
+fi
 
 curl bilibili.com &>/dev/null
 if [[ $? -ne 0 ]]; then

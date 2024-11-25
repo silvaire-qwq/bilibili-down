@@ -62,5 +62,5 @@ bilidown bv号
 6. 找到文件中名为 `cookies` 的变量，并将 ```cookies``` 的值中与下方名字相同的值按照下方格式填入 ```~/.config/bilidown```
 
 ```shell
-export cookies='DedeUserID=****; DedeUserID__ckMd5=****; SESSDATA=****; bili_jct=****'
+DedeUserID=****; DedeUserID__ckMd5=****; SESSDATA=****; bili_jct=****
 ```
